@@ -1,0 +1,17 @@
+{% extends "layouts/base.html" %}
+{% load bootstrap5 %}
+{% block content %}
+{% include "components/navbar.html" with show_edit_profile=False show_articles=False show_logout=False show_search_bar=False %}
+<div class="container mt-5 d-flex justify-content-center">
+    <div class="col-md-6">
+        <h2 class="mb-4 text-center">Вход</h2>
+        <form method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            {% bootstrap_form form %}
+            {% buttons %}
+                <button type="submit" class="btn btn-primary w-100">Войти</button>
+            {% endbuttons %}
+        </form>
+    </div>
+</div>
+{% endblock %}

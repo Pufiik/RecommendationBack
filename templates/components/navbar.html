@@ -1,0 +1,42 @@
+<nav class="navbar navbar-expand-lg bg-body-tertiary">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">Библиотека</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                {% if show_articles %}
+                <li class="nav-item">
+                    <a class="nav-link active" href="#">Просмотреть статьи</a>
+                </li>
+                {% endif %}
+                {% if show_edit_profile %}
+                <li class="nav-item">
+                    <a class="nav-link active">Редактировать профиль</a>
+<!--                    href="{% url 'profile.edit' %}-->
+                </li>
+                {% endif %}
+                {% if show_logout %}
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'logout' %}">Выход</a>
+                </li>
+                {% endif %}
+                {% if show_login %}
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'login' %}">Вход</a>
+                </li>
+                {% endif %}
+            </ul>
+            {% if show_search_bar %}
+            <form class="d-flex" role="search">
+                <input class="form-control me-2" type="search" placeholder="Поиск" aria-label="Search"/>
+                <button class="btn btn-outline-success" type="submit">Поиск</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</nav>

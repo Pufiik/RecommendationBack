@@ -1,0 +1,5 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+{% include "components/navbar.html" with show_edit_profile=True show_articles=True show_logout=True show_search_bar=True %}
+<p>Добро пожаловать, {{ user.username }}!</p>
+{% endblock %}
