@@ -1,9 +1,10 @@
 from threading import Lock
-
 import faiss
 import numpy as np
-
 from app.models import Article, EMBED_DIM
+
+NPROBE = 1
+NLIST = 1
 
 
 class FaissIndex:
@@ -12,40 +13,36 @@ class FaissIndex:
     _lock = Lock()
 
     @classmethod
-    def build_index(cls):
+    def build_index(cls, nlist=NLIST):
         with cls._lock:
-
-            valid_articles = []
-            embs_list = []
-            for a in Article.objects.all():
-                emb = a.embedding
-                if emb and len(emb) == EMBED_DIM:
-                    embs_list.append(np.array(emb, dtype='float32'))
-                    valid_articles.append(a.id)
-            if not embs_list:
+            valid = [(a.id, np.array(a.embedding, dtype='float32'))
+                     for a in Article.objects.all()
+                     if a.embedding and len(a.embedding) == EMBED_DIM]
+            if not valid:
                 cls._index = None
                 cls._ids = []
                 return
-            embs = np.stack(embs_list)
+
+            ids, embs = zip(*valid)
+            embs = np.stack(embs)
             faiss.normalize_L2(embs)
-            idx = faiss.IndexFlatIP(EMBED_DIM)
-            idx.add(embs)
-            cls._index = idx
-            cls._ids = valid_articles
-        with cls._lock:
-            embs = np.stack([a.embedding for a in Article.objects.all()]).astype('float32')
-            faiss.normalize_L2(embs)
-            idx = faiss.IndexFlatIP(EMBED_DIM)
-            idx.add(embs)
-            cls._index = idx
-            cls._ids = list(Article.objects.values_list('id', flat=True))
+
+            quantizer = faiss.IndexFlatIP(EMBED_DIM)
+            index = faiss.IndexIVFFlat(quantizer, EMBED_DIM, nlist, faiss.METRIC_INNER_PRODUCT)
+            index.train(embs)
+            index.add(embs)
+
+            cls._index = index
+            cls._ids = list(ids)
 
     @classmethod
-    def search(cls, vec, top_k=10):
+    def search(cls, vec, top_k=10, nprobe=NPROBE):
         if cls._index is None:
             cls.build_index()
         if cls._index is None:
             return []
+
+        cls._index.nprobe = nprobe
 
         v = np.array([vec], dtype='float32')
         faiss.normalize_L2(v)

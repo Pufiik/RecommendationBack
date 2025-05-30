@@ -4,8 +4,6 @@ from django.urls import reverse
 from django.contrib import auth
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
-from django.db.models import F
-from pgvector.django import CosineDistance
 
 from app.faiss_index import FaissIndex
 from app.forms import LoginForm
