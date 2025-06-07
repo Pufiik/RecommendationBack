@@ -1,0 +1,28 @@
+
+<div class="card" style="width: 18rem;" data-article-id="{{ item.id }}">
+  <div class="card-body">
+    <h5 class="lead">{{ item.title }}</h5>
+    <p class="lead">{{ item.annotation }}</p>
+
+    {% if show_likes %}
+      <div class="d-flex align-items-center mt-2">
+        <form method="post" action="{% url 'toggle_like' item.id %}">
+          {% csrf_token %}
+          <button
+            type="submit"
+            class="btn p-0 border-0 {% if item.liked %}text-primary{% else %}text-muted{% endif %}"
+            style="background: none; cursor: pointer;"
+            title="{% if item.liked %}Убрать лайк{% else %}Поставить лайк{% endif %}"
+          >
+            {% if item.liked %}
+              <i class="bi bi-hand-thumbs-up-fill" style="font-size: 1.25rem;"></i>
+            {% else %}
+              <i class="bi bi-hand-thumbs-up" style="font-size: 1.25rem;"></i>
+            {% endif %}
+          </button>
+        </form>
+        <span class="like-count ms-2">{{ item.like_count }}</span>
+      </div>
+    {% endif %}
+  </div>
+</div>

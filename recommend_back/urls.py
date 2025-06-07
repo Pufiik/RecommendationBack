@@ -24,6 +24,7 @@ urlpatterns = [
     path('login/', views.login, name='login'),
     path('', views.index, name='index'),
     path('recommend/', views.recommend, name='recommend'),
+    path('articles/<int:pk>/like/', views.toggle_like, name='toggle_like'),
     path('logout/', views.logout, name='logout'),
     path('profile/edit', views.profile_edit, name='profile.edit')
 ]

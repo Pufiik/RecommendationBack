@@ -1,10 +1,26 @@
 {% extends "layouts/base.html" %}
 {% block content %}
 {% include "components/navbar.html" with show_edit_profile=True show_articles=True show_logout=True show_search_bar=True %}
-{% for value in data %}
-<h1>{{ value.title }}</h1>
-<p>{{ value.annotation }}</p>
-{% empty %}
-<p>Ничего не найдено.</p>
-{% endfor %}
+<div align="center" class="row mt-4 mb-5">
+    <p class="lead">
+        Добро пожаловать в меню электронной библиотеки!
+    </p>
+</div>
+<div class="row">
+    <div class="col-7 ml-4 ">
+        <p class="lead">
+        Популярные статьи
+    </p>
+        {% for item in popular %}
+        {% include "components/item.html" with title=item.title text=item.text show_likes=True like_count=item.like_count liked=item.liked %}
+        {% empty %}
+        <div class="alert alert-info">Нет доступных элементов.</div>
+        {% endfor %}
+    </div>
+    <div class="col-5 text-center">
+        <a href="{% url 'recommend' %}" class="btn btn-primary">
+            Просмотреть статьи
+        </a>
+    </div>
+</div>
 {% endblock %}

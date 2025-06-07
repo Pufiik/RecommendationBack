@@ -1,0 +1,15 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+{% include "components/navbar.html" with show_edit_profile=True show_articles=True show_logout=True show_search_bar=True %}
+<div class="row">
+    <div class="col-8">
+        <div class="d-flex flex-column gap-3">
+            {% for item in items %}
+                {% include "components/item.html" with title=item.title text=item.text show_likes=True like_count=item.like_count liked=item.liked %}
+            {% empty %}
+                <div class="alert alert-info">Нет доступных элементов.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -3,8 +3,9 @@ import faiss
 import numpy as np
 from app.models import Article, EMBED_DIM
 
-NPROBE = 1
-NLIST = 1
+HNSW_M = 32
+HNSW_EF_CONSTRUCTION = 200
+HNSW_EF_SEARCH = 50
 
 
 class FaissIndex:
@@ -13,11 +14,14 @@ class FaissIndex:
     _lock = Lock()
 
     @classmethod
-    def build_index(cls, nlist=NLIST):
+    def build_index(cls):
+
         with cls._lock:
-            valid = [(a.id, np.array(a.embedding, dtype='float32'))
-                     for a in Article.objects.all()
-                     if a.embedding and len(a.embedding) == EMBED_DIM]
+            valid = [
+                (a.id, np.array(a.embedding, dtype='float32'))
+                for a in Article.objects.all()
+                if a.embedding and len(a.embedding) == EMBED_DIM
+            ]
             if not valid:
                 cls._index = None
                 cls._ids = []
@@ -27,22 +31,24 @@ class FaissIndex:
             embs = np.stack(embs)
             faiss.normalize_L2(embs)
 
-            quantizer = faiss.IndexFlatIP(EMBED_DIM)
-            index = faiss.IndexIVFFlat(quantizer, EMBED_DIM, nlist, faiss.METRIC_INNER_PRODUCT)
-            index.train(embs)
+            index = faiss.IndexHNSWFlat(EMBED_DIM, HNSW_M, faiss.METRIC_INNER_PRODUCT)
+
+            index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
+
             index.add(embs)
 
             cls._index = index
             cls._ids = list(ids)
 
     @classmethod
-    def search(cls, vec, top_k=10, nprobe=NPROBE):
+    def search(cls, vec, top_k=10, ef_search=HNSW_EF_SEARCH):
+
         if cls._index is None:
             cls.build_index()
         if cls._index is None:
             return []
 
-        cls._index.nprobe = nprobe
+        cls._index.hnsw.efSearch = ef_search
 
         v = np.array([vec], dtype='float32')
         faiss.normalize_L2(v)

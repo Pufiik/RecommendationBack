@@ -1,13 +1,16 @@
 import numpy as np
-from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib import auth
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
+from django.db.models import Q, Count, Case, When
+from django.views.decorators.http import require_http_methods
 
 from app.faiss_index import FaissIndex
 from app.forms import LoginForm
-from app.models import Article
+from app.models import Article, ArticleInteraction
 from app.serialization import ArticleSerializer
 from recommend_back import settings
 
@@ -20,7 +23,38 @@ def index(request):
 
 @login_required
 def profile_edit(request):
-    return render(request, 'profile/edit.html')
+    def popular_articles(n=5):
+        return (
+            Article.objects
+            .annotate(
+                like_count=Count(
+                    'interactions',
+                    filter=Q(interactions__vote=ArticleInteraction.LIKE)
+                )
+            )
+            .order_by('-like_count', '-created_at')[:n]
+        )
+
+    qs = popular_articles()
+    items = []
+    profile = request.user.profile
+    for art in qs:
+        liked = ArticleInteraction.objects.filter(
+            user_profile=profile,
+            article=art,
+            vote=ArticleInteraction.LIKE
+        ).exists()
+        items.append({
+            'id': art.id,
+            'title': art.title,
+            'annotation': art.annotation,
+            'like_count': art.like_count,
+            'liked': liked,
+        })
+
+        print(items)
+
+    return render(request, 'profile/edit.html', {'popular': items})
 
 
 def logout(request):
@@ -33,6 +67,7 @@ def login(request):
     if request.method == "POST":
 
         form = LoginForm(request.POST)
+
         if form.is_valid():
             user = auth.authenticate(request, **form.cleaned_data)
             if user:
@@ -47,18 +82,25 @@ def recommend(request):
     profile = request.user.profile
     vec = profile.embedding
     read_ids = profile.interactions.values_list('article_id', flat=True)
-    print(vec)
-    print(read_ids)
 
     if settings.USE_FAISS:
         ids_scores = FaissIndex.search(vec, top_k=N)
-        print(ids_scores)
         ids = [i for i, _ in ids_scores if i not in read_ids]
-        print(ids)
-        qs = Article.objects.filter(id__in=ids)
-        print(qs)
+        qs = (
+            Article.objects
+            .filter(id__in=ids)
+            .annotate(
+                like_count=Count(
+                    'interactions',
+                    filter=Q(interactions__vote=ArticleInteraction.LIKE)
+                )
+            )
+        )
+
+        preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(ids)])
+        qs = qs.order_by(preserved)
+
     else:
-        print(1)
         all_candidates = Article.objects.exclude(id__in=read_ids)
 
         def cosine(a, b):
@@ -68,9 +110,39 @@ def recommend(request):
 
         scored = [(article, cosine(article.embedding, vec)) for article in all_candidates]
         scored.sort(key=lambda x: x[1], reverse=True)
-        qs = [article for article, _ in scored[:10]]
+        top_articles = [article for article, _ in scored[:N]]
+        top_ids = [a.id for a in top_articles]
 
-    data = ArticleSerializer(qs, many=True).data
-    print('data')
-    print(data)
-    return render(request, 'profile/help.html', context={'data': data})
+        qs = (
+            Article.objects
+            .filter(id__in=top_ids)
+            .annotate(
+                like_count=Count(
+                    'interactions',
+                    filter=Q(interactions__vote=ArticleInteraction.LIKE)
+                )
+            )
+        )
+        preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(top_ids)])
+        qs = qs.order_by(preserved)
+
+    data = ArticleSerializer(qs, many=True, context={'request': request}).data
+    return render(request, 'profile/recommend.html', {'items': data})
+
+
+@login_required
+def toggle_like(request, pk):
+    article = get_object_or_404(Article, pk=pk)
+    profile = request.user.profile
+    try:
+        inter = ArticleInteraction.objects.get(user_profile=profile, article=article)
+        print(1)
+        print(inter)
+        inter.delete()
+    except ArticleInteraction.DoesNotExist:
+        ArticleInteraction.objects.create(
+            user_profile=profile,
+            article=article,
+            vote=ArticleInteraction.LIKE
+        )
+    return redirect(reverse('profile.edit'))

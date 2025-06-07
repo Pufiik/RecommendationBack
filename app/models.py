@@ -16,16 +16,29 @@ class ArticleInteractionManager(models.Manager):
     def read_articles(self):
         return self.filter(read=True)
 
+    def for_user(self, user_profile):
+        return self.filter(user_profile=user_profile)
+
 
 class Article(models.Model):
+    RU = "ru"
+    ENG = "eng"
+
+    LANG_CHOICES = (
+        (RU, "ru"),
+        (ENG, "eng"),
+    )
+
     title = models.CharField(max_length=MAX_LENGTH)
     annotation = models.TextField()
     content = models.TextField()
+    language = models.CharField(
+        max_length=3,
+        choices=LANG_CHOICES,
+        default=RU,
+    )
     embedding = ArrayField(models.FloatField(), size=EMBED_DIM, default=list)
     created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Profile of {self.title}"
 
 
 class UserProfile(models.Model):
@@ -35,8 +48,6 @@ class UserProfile(models.Model):
     embedding = ArrayField(models.FloatField(), size=EMBED_DIM, default=list)
     update_date = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return f"Profile of {self.user.name}"
 
 
 class ArticleInteraction(models.Model):
@@ -64,6 +75,3 @@ class ArticleInteraction(models.Model):
         unique_together = ('user_profile', 'article')
         ordering = ('-date',)
 
-    def __str__(self):
-        vote_display = dict(self.VOTE_CHOICES).get(self.vote, 'No vote')
-        return f"{self.user_profile.name} → '{self.article.title[:50]}' | Vote: {vote_display} | Read: {self.read}"
