@@ -1,8 +1,7 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.contrib.auth.models import User
-
-EMBED_DIM = 2
+from .constants import UMAP_DIM
 MAX_LENGTH = 500
 
 
@@ -13,11 +12,23 @@ class ArticleInteractionManager(models.Manager):
     def disliked(self):
         return self.filter(vote=ArticleInteraction.DISLIKE)
 
+    def none(self):
+        return self.filter(vote=ArticleInteraction.NONE)
+
     def read_articles(self):
         return self.filter(read=True)
 
     def for_user(self, user_profile):
         return self.filter(user_profile=user_profile)
+
+
+class ArticleManager(models.Manager):
+
+    def get_russian_articles(self):
+        return self.filter(language=Article.RU)
+
+    def get_english_articles(self):
+        return self.filter(language=Article.ENG)
 
 
 class Article(models.Model):
@@ -37,24 +48,27 @@ class Article(models.Model):
         choices=LANG_CHOICES,
         default=RU,
     )
-    embedding = ArrayField(models.FloatField(), size=EMBED_DIM, default=list)
+    embedding = ArrayField(models.FloatField(), size=UMAP_DIM, default=list)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ArticleManager()
 
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User,
                                 on_delete=models.CASCADE,
                                 related_name='profile')
-    embedding = ArrayField(models.FloatField(), size=EMBED_DIM, default=list)
+    embedding = ArrayField(models.FloatField(), size=UMAP_DIM, default=list)
     update_date = models.DateTimeField(auto_now=True)
-
 
 
 class ArticleInteraction(models.Model):
     LIKE = 1
     DISLIKE = -1
+    NONE = 0
     VOTE_CHOICES = (
         (LIKE, 'Like'),
+        (NONE, 'Default'),
         (DISLIKE, 'Dislike'),
     )
 
@@ -65,8 +79,7 @@ class ArticleInteraction(models.Model):
                                 on_delete=models.CASCADE,
                                 related_name='interactions')
     read = models.BooleanField(default=False)
-    vote = models.SmallIntegerField(choices=VOTE_CHOICES,
-                                    null=True, blank=True)
+    vote = models.SmallIntegerField(choices=VOTE_CHOICES, default=NONE, blank=True)
     date = models.DateTimeField(auto_now=True)
 
     objects = ArticleInteractionManager()
@@ -74,4 +87,3 @@ class ArticleInteraction(models.Model):
     class Meta:
         unique_together = ('user_profile', 'article')
         ordering = ('-date',)
-

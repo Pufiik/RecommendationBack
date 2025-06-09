@@ -1,11 +1,8 @@
 from threading import Lock
 import faiss
 import numpy as np
-from app.models import Article, EMBED_DIM
-
-HNSW_M = 32
-HNSW_EF_CONSTRUCTION = 200
-HNSW_EF_SEARCH = 50
+from app.models import Article
+from .constants import UMAP_DIM, HNSW_EF_SEARCH, HNSW_EF_CONSTRUCTION, HNSW_M
 
 
 class FaissIndex:
@@ -20,7 +17,7 @@ class FaissIndex:
             valid = [
                 (a.id, np.array(a.embedding, dtype='float32'))
                 for a in Article.objects.all()
-                if a.embedding and len(a.embedding) == EMBED_DIM
+                if a.embedding and len(a.embedding) == UMAP_DIM
             ]
             if not valid:
                 cls._index = None
@@ -31,7 +28,7 @@ class FaissIndex:
             embs = np.stack(embs)
             faiss.normalize_L2(embs)
 
-            index = faiss.IndexHNSWFlat(EMBED_DIM, HNSW_M, faiss.METRIC_INNER_PRODUCT)
+            index = faiss.IndexHNSWFlat(UMAP_DIM, HNSW_M, faiss.METRIC_INNER_PRODUCT)
 
             index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
 

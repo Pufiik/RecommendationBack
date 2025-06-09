@@ -1,0 +1,86 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+{% include "components/navbar.html" with show_edit_profile=True show_articles=True show_logout=True show_search_bar=True %}
+
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-md-8">
+      <h1>{{ article.title }}</h1>
+      <p class="text-muted">Опубликовано: {{ article.created_at|date:"d.m.Y H:i" }}</p>
+
+      <h5>Аннотация</h5>
+      <p>{{ article.annotation }}</p>
+
+      <h5>Содержимое</h5>
+      <p>{{ article.content }}</p>
+
+      <div class="d-flex align-items-center mt-4">
+        <form method="post" action="{% url 'toggle_like' article.id %}">
+          {% csrf_token %}
+          <button type="submit"
+                  class="btn p-0 border-0 {% if user_liked %}text-primary{% else %}text-muted{% endif %}"
+                  style="background: none; cursor: pointer;">
+            {% if user_liked %}
+              <i class="bi bi-hand-thumbs-up-fill" style="font-size: 1.5rem;"></i>
+            {% else %}
+              <i class="bi bi-hand-thumbs-up" style="font-size: 1.5rem;"></i>
+            {% endif %}
+          </button>
+        </form>
+        <span class="ms-2">{{ like_count }} {{ like_count|pluralize:"лайк,лайка,лайков" }}</span>
+      </div>
+    </div>
+
+    <!-- Правая колонка: фильтр и рекомендации -->
+    <div class="col-md-4">
+      <!-- Форма фильтра по языку -->
+      <div class="card mb-3">
+        <div class="card-body">
+         <form method="get" action="{% url 'article_similar' article.id %}" class="d-flex">
+            <select name="lang" class="form-select me-2">
+              <option value="all" {% if lang == 'all' %}selected{% endif %}>Все языки</option>
+              <option value="{{ article.RU }}" {% if lang == article.RU %}selected{% endif %}>Русский</option>
+              <option value="{{ article.ENG }}" {% if lang == article.ENG %}selected{% endif %}>Английский</option>
+            </select>
+            <button type="submit" class="btn btn-secondary">Показать</button>
+          </form>
+        </div>
+      </div>
+
+      <h5>Похожие статьи</h5>
+      <div class="d-flex flex-column gap-3">
+        {% for item in similar %}
+          <div class="card">
+            <div class="card-body">
+              <h6 class="card-title">{{ item.title }}</h6>
+              <p class="card-text mb-2">
+                <a href="{% url 'article_detail' item.id %}"
+                   class="text-decoration-none text-dark">
+                  {{ item.annotation|truncatechars:50 }}{% if item.annotation|length > 50 %}…{% endif %}
+                </a>
+              </p>
+              <div class="d-flex align-items-center">
+                <form method="post" action="{% url 'toggle_like' item.id %}">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="btn p-0 border-0 {% if item.liked %}text-primary{% else %}text-muted{% endif %}"
+                          style="background: none; cursor: pointer;">
+                    {% if item.liked %}
+                      <i class="bi bi-hand-thumbs-up-fill" style="font-size: 1.25rem;"></i>
+                    {% else %}
+                      <i class="bi bi-hand-thumbs-up" style="font-size: 1.25rem;"></i>
+                    {% endif %}
+                  </button>
+                </form>
+                <span class="ms-2">{{ item.like_count }}</span>
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-muted">Похожих статей не найдено.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
