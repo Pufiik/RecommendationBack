@@ -1,4 +1,3 @@
-from signal import signal
 import numpy as np
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -38,18 +37,16 @@ def update_user_embedding(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=UserProfile)
+def get_start_user_embedding(sender, instance, created, **kwargs):
+    recalc_embedding_for_profile(instance)
+    print(instance.embedding)
+
+
 @receiver(post_delete, sender=ArticleInteraction)
 def get_start_user_embedding(sender, instance, **kwargs):
-    flag = False
-    if sender is ArticleInteraction and signal == post_delete:
-        profile = instance.user_profile
-        liked_interactions = profile.interactions.filter(vote=ArticleInteraction.LIKE)
-        if liked_interactions.exists():
-            flag = True
-    if sender is UserProfile and signal == post_save:
-        flag = True
-
-    if flag:
+    profile = instance.user_profile
+    liked_interactions = profile.interactions.filter(vote=ArticleInteraction.LIKE)
+    if liked_interactions.exists():
         all_embs = [a.embedding for a in Article.objects.all() if a.embedding]
         if not all_embs:
             instance.embedding = [0.0] * UMAP_DIM
@@ -62,6 +59,18 @@ def get_start_user_embedding(sender, instance, **kwargs):
         pass
 
 
+def recalc_embedding_for_profile(profile):
+    liked = profile.interactions.filter(vote=ArticleInteraction.LIKE)
+    if liked.exists():
+        embeddings = [a.embedding for a in Article.objects.exclude(embedding=[])]
+        mat = np.stack(embeddings)
+        avg = mat.mean(axis=0).reshape(1, -1)
+        profile.embedding = normalize(avg)[0].tolist()
+    else:
+        profile.embedding = [0.0] * UMAP_DIM
+    profile.save()
+
+
 @receiver(post_save, sender=Article)
 def vectorize_and_rebuild(sender, instance: Article, created, **kwargs):
     if not instance.annotation and instance.language == Article.RU:
@@ -69,22 +78,24 @@ def vectorize_and_rebuild(sender, instance: Article, created, **kwargs):
         annotation = create_annotation(instance.content)
     else:
         annotation = instance.annotation or instance.content
+        should_rebuild = False
 
-    init_embedding_model()
+        if not instance.embedding:
+            init_embedding_model()
+            raw_emb = embed_bert_cls(annotation)
 
-    init_embedding_model()
-    raw_emb = embed_bert_cls(annotation)
+            same = Article.objects.filter(language=instance.language)
+            all_embs = [np.array(a.embedding) for a in same if a.embedding]
+            all_embs.append(raw_emb.astype('float32'))
+            reducer = _get_reducer(instance.language)
+            reduced = reducer.fit_transform(np.stack(all_embs))
+            new_emb = reduced[-1]
 
-    same_lang_qs = Article.objects.filter(language=instance.language)
-    all_embs = [np.array(a.embedding) for a in same_lang_qs if a.embedding]
-    all_embs.append(raw_emb.astype('float32'))
+            Article.objects.filter(pk=instance.pk).update(embedding=new_emb.tolist())
+            should_rebuild = True
 
-    reducer = _get_reducer(instance.language)
-    reduced = reducer.fit_transform(np.stack(all_embs))
-
-    new_emb = reduced[-1]
-    Article.objects.filter(pk=instance.pk).update(embedding=new_emb.tolist())
-    FaissIndex.build_index()
+        if should_rebuild:
+            FaissIndex.build_index()
 
 
 @receiver(post_delete, sender=Article)

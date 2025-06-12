@@ -1,12 +1,10 @@
 {# templates/components/item.html #}
-<div class="d-flex flex-column gap-3">
-    <div class="card" style="width: 18rem;" data-article-id="{{ item.id }}">
+<div class="card {{ extra_class }}">
         <div class="card-body">
             <h5 class="lead">{{ item.title }}</h5>
             <p class="lead mb-2">
                 <a href="{% url 'article_detail' item.id %}" class="text-decoration-none text-dark">
                     {{ item.annotation|truncatechars:50 }}
-                    {% if item.annotation|length > 50 %}…{% endif %}
                 </a>
             </p>
             {% if show_likes %}
@@ -28,5 +26,4 @@
             </div>
             {% endif %}
         </div>
-    </div>
 </div>

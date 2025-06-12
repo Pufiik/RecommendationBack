@@ -1,21 +1,26 @@
 {% extends "layouts/base.html" %}
 {% block content %}
 {% include "components/navbar.html" with show_edit_profile=True show_articles=True show_logout=True show_search_bar=True %}
-<div align="center" class="row mt-4 mb-5">
-    <p class="lead">
-        Добро пожаловать в меню электронной библиотеки!
-    </p>
-</div>
+ <div class="row justify-content-center mt-4 mb-5">
+    <div class="col-auto">
+      <p class="lead text-center">Добро пожаловать в меню электронной библиотеки!</p>
+    </div>
+  </div>
+
 <div class="row">
-    <div class="col-7 ml-4 ">
-        <p class="lead">
+    <div class="col-md-7 px-3">
+        <p class="lead px-5">
         Популярные статьи
     </p>
+         <div class="col-md-7 px-3">
         {% for item in popular %}
-        {% include "components/item.html" with title=item.title text=item.text show_likes=True like_count=item.like_count liked=item.liked %}
-        {% empty %}
+              <div class="col mb-3">
+        {% include "components/item.html" with title=item.title text=item.text show_likes=True like_count=item.like_count liked=item.liked extra_class="h-200"%}
+              </div>
+                  {% empty %}
         <div class="alert alert-info">Нет доступных элементов.</div>
         {% endfor %}
+         </div>
     </div>
     <div class="col-5 text-center">
         <a href="{% url 'recommend' %}" class="btn btn-primary">
