@@ -144,10 +144,13 @@ def similar_articles(request, pk):
     profile = request.user.profile
 
     user_liked = ArticleInteraction.objects.filter(
-        user_profile=profile, article=article, vote=ArticleInteraction.LIKE
+        user_profile=profile,
+        article=article,
+        vote=ArticleInteraction.LIKE
     ).exists()
     like_count = ArticleInteraction.objects.filter(
-        article=article, vote=ArticleInteraction.LIKE
+        article=article,
+        vote=ArticleInteraction.LIKE
     ).count()
 
     lang = request.GET.get('lang', 'all')
@@ -162,45 +165,45 @@ def similar_articles(request, pk):
 
     if settings.USE_FAISS:
         raw = FaissIndex.search(article.embedding, top_k=N + 1)
-        similar_ids = [
-                          i for i, _ in raw
-                          if i != article.id and (allowed_ids is None or i in allowed_ids)
-                      ][:N]
+        candidates = [i for i, _ in raw if i != article.id]
     else:
-        exclude_ids = {article.id}
-        if allowed_ids is not None:
-            ids = get_cosine_similar_ids(
-                query_vec=article.embedding,
-                exclude_ids=exclude_ids,
-                top_k=N,
-                filter_ids=allowed_ids
-            )
-        else:
-            ids = get_cosine_similar_ids(
-                query_vec=article.embedding,
-                exclude_ids=exclude_ids,
-                top_k=N,
-            )
-        similar_ids = ids
+        candidates = get_cosine_similar_ids(
+            query_vec=article.embedding,
+            exclude_ids={article.id},
+            top_k=N,
+            filter_ids=allowed_ids
+        )
+
+    if allowed_ids is None:
+        similar_ids = candidates[:N]
+    else:
+        similar_ids = [i for i in candidates if i in allowed_ids][:N]
 
     if not similar_ids:
         similar = []
     else:
-        qs = Article.objects.filter(id__in=similar_ids).annotate(
-            like_count=Count(
-                'interactions',
-                filter=Q(interactions__vote=ArticleInteraction.LIKE)
+        qs = (
+            Article.objects
+            .filter(id__in=similar_ids)
+            .annotate(
+                like_count=Count(
+                    'interactions',
+                    filter=Q(interactions__vote=ArticleInteraction.LIKE)
+                )
             )
         )
-        preserved = Case(
-            *[When(pk=pk_, then=pos) for pos, pk_ in enumerate(similar_ids)]
-        )
+
+        preserved = Case(*[
+            When(pk=pk_, then=pos) for pos, pk_ in enumerate(similar_ids)
+        ], output_field=IntegerField())
         qs = qs.order_by(preserved)
 
         similar = []
         for art in qs:
             liked_flag = ArticleInteraction.objects.filter(
-                user_profile=profile, article=art, vote=ArticleInteraction.LIKE
+                user_profile=profile,
+                article=art,
+                vote=ArticleInteraction.LIKE
             ).exists()
             similar.append({
                 'id': art.id,

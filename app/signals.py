@@ -72,32 +72,36 @@ def recalc_embedding_for_profile(profile):
 
 
 @receiver(post_save, sender=Article)
-def vectorize_and_rebuild(sender, instance: Article, created, **kwargs):
+def vectorize_and_rebuild(sender, instance: Article, **kwargs):
     if not instance.annotation and instance.language == Article.RU:
         init_summarizer()
         annotation = create_annotation(instance.content)
+        Article.objects.filter(pk=instance.pk).update(annotation=annotation)
     else:
         annotation = instance.annotation or instance.content
-        should_rebuild = False
 
-        if not instance.embedding:
-            init_embedding_model()
-            raw_emb = embed_bert_cls(annotation)
+    emb = instance.embedding
+    if not instance.embedding:
+        init_embedding_model()
+        raw_emb = embed_bert_cls(annotation)
 
-            same = Article.objects.filter(language=instance.language)
-            all_embs = [np.array(a.embedding) for a in same if a.embedding]
-            all_embs.append(raw_emb.astype('float32'))
-            reducer = _get_reducer(instance.language)
-            reduced = reducer.fit_transform(np.stack(all_embs))
-            new_emb = reduced[-1]
+        same_lang_qs = Article.objects.filter(language=instance.language)
+        all_embs = [np.array(a.embedding, dtype='float32')
+                    for a in same_lang_qs if a.embedding]
+        all_embs.append(raw_emb.astype('float32'))
 
-            Article.objects.filter(pk=instance.pk).update(embedding=new_emb.tolist())
-            should_rebuild = True
+        reducer = _get_reducer(instance.language)
+        reduced = reducer.fit_transform(np.stack(all_embs))
+        emb = new_emb = reduced[-1]
 
-        if should_rebuild:
-            FaissIndex.build_index()
+        Article.objects.filter(pk=instance.pk).update(embedding=new_emb.tolist())
+
+    FaissIndex._ensure_index()
+    FaissIndex.add_vector(instance.id, emb)
+    FaissIndex.save_index()
 
 
 @receiver(post_delete, sender=Article)
 def rebuild_after_delete(sender, instance: Article, **kwargs):
-    FaissIndex.build_index()
+    FaissIndex.remove_vector(instance.id)
+    FaissIndex.save_index()
